@@ -1,4 +1,4 @@
-﻿#region Copyright notice and license
+#region Copyright notice and license
 
 // Copyright 2019 The gRPC Authors
 //
@@ -22,6 +22,37 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Grpc.AspNetCore.Server.Internal.CallHandlers;
+
+internal class ServerStreamingServerCallHandler<TRequest, TResponse> : ServerCallHandlerBase<TRequest, TResponse>
+    where TRequest : class
+    where TResponse : class
+{
+    private readonly ServerStreamingServerMethodInvoker<TRequest, TResponse> _invoker;
+
+    public ServerStreamingServerCallHandler(
+        ServerStreamingServerMethodInvoker<TRequest, TResponse> invoker,
+        ILoggerFactory loggerFactory)
+        : base(invoker, loggerFactory)
+    {
+        _invoker = invoker;
+    }
+
+    protected override async Task HandleCallAsyncCore(HttpContext httpContext, HttpContextServerCallContext serverCallContext)
+    {
+        // Decode request
+        var request = await httpContext.Request.BodyReader.ReadSingleMessageAsync<TRequest>(serverCallContext, MethodInvoker.Method.RequestMarshaller.ContextualDeserializer);
+
+        var streamWriter = new HttpContextStreamWriter<TResponse>(serverCallContext, MethodInvoker.Method.ResponseMarshaller.ContextualSerializer);
+        try
+        {
+            await _invoker.Invoke(httpContext, serverCallContext, request, streamWriter);
+        }
+        finally
+        {
+            streamWriter.Complete();
+        }
+    }
+}
 
 internal class ServerStreamingServerCallHandler<
 #if NET5_0_OR_GREATER

@@ -71,6 +71,7 @@ public static class GrpcServicesExtensions
         });
         services.AddOptions();
         services.TryAddSingleton<GrpcMarkerService>();
+        services.TryAddSingleton(typeof(ServerCallHandlerFactory));
         services.TryAddSingleton(typeof(ServerCallHandlerFactory<>));
         services.TryAddSingleton(typeof(IGrpcServiceActivator<>), typeof(DefaultGrpcServiceActivator<>));
         services.TryAddSingleton(typeof(IGrpcInterceptorActivator<>), typeof(DefaultGrpcInterceptorActivator<>));
@@ -78,6 +79,7 @@ public static class GrpcServicesExtensions
 
         // Model
         services.TryAddSingleton<ServiceMethodsRegistry>();
+        services.TryAddSingleton(typeof(ServiceRouteBuilder));
         services.TryAddSingleton(typeof(ServiceRouteBuilder<>));
         services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IServiceMethodProvider<>), typeof(BinderServiceMethodProvider<>)));
 

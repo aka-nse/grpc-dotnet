@@ -1,4 +1,4 @@
-﻿#region Copyright notice and license
+#region Copyright notice and license
 
 // Copyright 2019 The gRPC Authors
 //
@@ -19,8 +19,10 @@
 using System.Diagnostics.CodeAnalysis;
 using Grpc.AspNetCore.Server.Internal;
 using Grpc.AspNetCore.Server.Model.Internal;
+using Grpc.Core;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.AspNetCore.Builder;
 
@@ -50,6 +52,53 @@ public static class GrpcEndpointRouteBuilderExtensions
 
         var serviceRouteBuilder = builder.ServiceProvider.GetRequiredService<ServiceRouteBuilder<TService>>();
         var endpointConventionBuilders = serviceRouteBuilder.Build(builder);
+
+        return new GrpcServiceEndpointConventionBuilder(endpointConventionBuilders);
+    }
+
+    /// <summary>
+    /// Maps incoming requests to the specified <see cref="ServerServiceDefinition"/> instance.
+    /// </summary>
+    /// <param name="builder">The <see cref="IEndpointRouteBuilder"/> to add the route to.</param>
+    /// <param name="serviceDefinition">The instance of <see cref="ServerServiceDefinition"/>.</param>
+    /// <returns>A <see cref="GrpcServiceEndpointConventionBuilder"/> for endpoints associated with the service.</returns>
+    public static GrpcServiceEndpointConventionBuilder MapGrpcService(this IEndpointRouteBuilder builder, ServerServiceDefinition serviceDefinition)
+    {
+        if (builder == null)
+        {
+            throw new ArgumentNullException(nameof(builder));
+        }
+        if (serviceDefinition == null)
+        {
+            throw new ArgumentNullException(nameof(serviceDefinition));
+        }
+
+        var serviceRouteBuilder = builder.ServiceProvider.GetRequiredService<ServiceRouteBuilder>();
+        var endpointConventionBuilders = serviceRouteBuilder.Build(builder, serviceDefinition);
+
+        return new GrpcServiceEndpointConventionBuilder(endpointConventionBuilders);
+    }
+
+    /// <summary>
+    /// Maps incoming requests to the <see cref="ServerServiceDefinition"/> instance from the specified factory.
+    /// </summary>
+    /// <param name="builder">The <see cref="IEndpointRouteBuilder"/> to add the route to.</param>
+    /// <param name="getServiceDefinition">The factory for <see cref="ServerServiceDefinition"/> instance.</param>
+    /// <returns>A <see cref="GrpcServiceEndpointConventionBuilder"/> for endpoints associated with the service.</returns>
+    public static GrpcServiceEndpointConventionBuilder MapGrpcService(this IEndpointRouteBuilder builder, Func<IServiceProvider, ServerServiceDefinition> getServiceDefinition)
+    {
+        if (builder == null)
+        {
+            throw new ArgumentNullException(nameof(builder));
+        }
+        if(getServiceDefinition == null)
+        {
+            throw new ArgumentNullException(nameof(getServiceDefinition));
+        }
+
+        var serviceDefinition = getServiceDefinition(builder.ServiceProvider);
+        var serviceRouteBuilder = builder.ServiceProvider.GetRequiredService<ServiceRouteBuilder>();
+        var endpointConventionBuilders = serviceRouteBuilder.Build(builder, serviceDefinition);
 
         return new GrpcServiceEndpointConventionBuilder(endpointConventionBuilders);
     }

@@ -25,9 +25,49 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Routing.Patterns;
 using Microsoft.Extensions.Logging;
-using Log = Grpc.AspNetCore.Server.Model.Internal.ServiceRouteBuilderLog;
+using Helper = Grpc.AspNetCore.Server.Model.Internal.ServiceRouteBuilderHelper;
 
 namespace Grpc.AspNetCore.Server.Model.Internal;
+
+internal class ServiceRouteBuilder
+{
+    private readonly ServerCallHandlerFactory _serverCallHandlerFactory;
+    private readonly ServiceMethodsRegistry _serviceMethodsRegistry;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly ILogger _logger;
+
+    public ServiceRouteBuilder(
+        ServerCallHandlerFactory callHandlerFactory,
+        ServiceMethodsRegistry serviceMethodsRegistry,
+        ILoggerFactory loggerFactory)
+    {
+        _serverCallHandlerFactory = callHandlerFactory;
+        _serviceMethodsRegistry = serviceMethodsRegistry;
+        _loggerFactory = loggerFactory;
+        _logger = loggerFactory.CreateLogger<ServiceRouteBuilder>();
+    }
+
+    internal List<IEndpointConventionBuilder> Build(IEndpointRouteBuilder endpointRouteBuilder, ServerServiceDefinition serverServiceDefinition)
+    {
+        Helper.LogDiscoveringServiceMethods(_logger, typeof(ServerServiceDefinition));
+
+        var serviceBinder = new EndpointServiceBinder(_serverCallHandlerFactory, endpointRouteBuilder, _loggerFactory);
+
+        serverServiceDefinition.BindService(serviceBinder);
+        var endpointConventionBuilders = serviceBinder.EndpointConventionBuilders;
+
+        Helper.CreateUnimplementedEndpoints(
+            endpointRouteBuilder,
+            _serviceMethodsRegistry,
+            _serverCallHandlerFactory,
+            serviceBinder.MethodModels,
+            endpointConventionBuilders);
+
+        _serviceMethodsRegistry.Methods.AddRange(serviceBinder.MethodModels);
+
+        return endpointConventionBuilders;
+    }
+}
 
 internal class ServiceRouteBuilder<
 #if NET5_0_OR_GREATER
@@ -54,7 +94,7 @@ internal class ServiceRouteBuilder<
 
     internal List<IEndpointConventionBuilder> Build(IEndpointRouteBuilder endpointRouteBuilder)
     {
-        Log.DiscoveringServiceMethods(_logger, typeof(TService));
+        Helper.LogDiscoveringServiceMethods(_logger, typeof(TService));
 
         var serviceMethodProviderContext = new ServiceMethodProviderContext<TService>(_serverCallHandlerFactory);
         foreach (var serviceMethodProvider in _serviceMethodProviders)
@@ -85,7 +125,7 @@ internal class ServiceRouteBuilder<
                 // Report the last HttpMethodMetadata added. It's the metadata used by routing.
                 var httpMethod = method.Metadata.OfType<HttpMethodMetadata>().LastOrDefault();
 
-                Log.AddedServiceMethod(
+                Helper.LogAddedServiceMethod(
                     _logger,
                     method.Method.Name,
                     method.Method.ServiceName,
@@ -96,10 +136,10 @@ internal class ServiceRouteBuilder<
         }
         else
         {
-            Log.NoServiceMethodsDiscovered(_logger, typeof(TService));
+            Helper.LogNoServiceMethodsDiscovered(_logger, typeof(TService));
         }
 
-        CreateUnimplementedEndpoints(
+        Helper.CreateUnimplementedEndpoints(
             endpointRouteBuilder,
             _serviceMethodsRegistry,
             _serverCallHandlerFactory,
@@ -110,11 +150,14 @@ internal class ServiceRouteBuilder<
 
         return endpointConventionBuilders;
     }
+}
 
+internal static class ServiceRouteBuilderHelper
+{
     internal static void CreateUnimplementedEndpoints(
         IEndpointRouteBuilder endpointRouteBuilder,
         ServiceMethodsRegistry serviceMethodsRegistry,
-        ServerCallHandlerFactory<TService> serverCallHandlerFactory,
+        IServerCallHandlerFactory serverCallHandlerFactory,
         List<MethodModel> serviceMethods,
         List<IEndpointConventionBuilder> endpointConventionBuilders)
     {
@@ -160,10 +203,7 @@ internal class ServiceRouteBuilder<
 
         return endpointBuilder;
     }
-}
 
-internal static class ServiceRouteBuilderLog
-{
     private static readonly Action<ILogger, string, string, MethodType, string, string, Exception?> _addedServiceMethod =
         LoggerMessage.Define<string, string, MethodType, string, string>(LogLevel.Trace, new EventId(1, "AddedServiceMethod"), "Added gRPC method '{MethodName}' to service '{ServiceName}'. Method type: {MethodType}, HTTP method: {HttpMethod}, route pattern: '{RoutePattern}'.");
 
@@ -173,7 +213,7 @@ internal static class ServiceRouteBuilderLog
     private static readonly Action<ILogger, Type, Exception?> _noServiceMethodsDiscovered =
         LoggerMessage.Define<Type>(LogLevel.Debug, new EventId(3, "NoServiceMethodsDiscovered"), "No gRPC methods discovered for {ServiceType}.");
 
-    public static void AddedServiceMethod(ILogger logger, string methodName, string serviceName, MethodType methodType, IReadOnlyList<string> httpMethods, string routePattern)
+    public static void LogAddedServiceMethod(ILogger logger, string methodName, string serviceName, MethodType methodType, IReadOnlyList<string> httpMethods, string routePattern)
     {
         if (logger.IsEnabled(LogLevel.Trace))
         {
@@ -184,12 +224,12 @@ internal static class ServiceRouteBuilderLog
         }
     }
 
-    public static void DiscoveringServiceMethods(ILogger logger, Type serviceType)
+    public static void LogDiscoveringServiceMethods(ILogger logger, Type serviceType)
     {
         _discoveringServiceMethods(logger, serviceType, null);
     }
 
-    public static void NoServiceMethodsDiscovered(ILogger logger, Type serviceType)
+    public static void LogNoServiceMethodsDiscovered(ILogger logger, Type serviceType)
     {
         _noServiceMethodsDiscovered(logger, serviceType, null);
     }

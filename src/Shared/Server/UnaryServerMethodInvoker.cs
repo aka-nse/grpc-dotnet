@@ -1,4 +1,4 @@
-﻿#region Copyright notice and license
+#region Copyright notice and license
 
 // Copyright 2019 The gRPC Authors
 //
@@ -25,6 +25,52 @@ using Grpc.Core;
 using Microsoft.AspNetCore.Http;
 
 namespace Grpc.Shared.Server;
+
+/// <summary>
+/// Unary server method invoker for <see cref="Grpc.Core.ServerServiceDefinition"/>.
+/// </summary>
+/// <typeparam name="TRequest">Request message type for this method.</typeparam>
+/// <typeparam name="TResponse">Response message type for this method.</typeparam>
+internal sealed class UnaryServerMethodInvoker<TRequest, TResponse> : ServerMethodInvokerBase<TRequest, TResponse>
+    where TRequest : class
+    where TResponse : class
+{
+    private readonly UnaryServerMethod<TRequest, TResponse> _invoker;
+
+    /// <summary>
+    /// Creates a new instance of <see cref="UnaryServerMethodInvoker{TRequest, TResponse}"/>.
+    /// </summary>
+    /// <param name="invoker">The unary method to invoke.</param>
+    /// <param name="method">The description of the gRPC method.</param>
+    /// <param name="options">The options used to execute the method.</param>
+    public UnaryServerMethodInvoker(
+        UnaryServerMethod<TRequest, TResponse> invoker,
+        Method<TRequest, TResponse> method,
+        MethodOptions options)
+        : base(method, options)
+    {
+        _invoker = invoker;
+
+        if (Options.HasInterceptors)
+        {
+            var interceptorPipeline = new InterceptorPipelineBuilder<TRequest, TResponse>(Options.Interceptors);
+            _invoker = interceptorPipeline.UnaryPipeline(_invoker);
+        }
+    }
+
+    /// <summary>
+    /// Invoke the unary method with the specified <see cref="HttpContext"/>.
+    /// </summary>
+    /// <param name="_">The <see cref="HttpContext"/> for the current request.</param>
+    /// <param name="serverCallContext">The <see cref="ServerCallContext"/>.</param>
+    /// <param name="request">The <typeparamref name="TRequest"/> message.</param>
+    /// <returns>A <see cref="Task{TResponse}"/> that represents the asynchronous method. The <see cref="Task{TResponse}.Result"/>
+    /// property returns the <typeparamref name="TResponse"/> message.</returns>
+    public Task<TResponse> Invoke(HttpContext _, ServerCallContext serverCallContext, TRequest request)
+    {
+        return _invoker(request, serverCallContext);
+    }
+}
 
 /// <summary>
 /// Unary server method invoker.
