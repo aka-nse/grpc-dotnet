@@ -23,6 +23,7 @@ using Grpc.Core;
 using Grpc.Shared;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.AspNetCore.Builder;
 
