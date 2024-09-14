@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 using Grpc.Core;
 using Microsoft.AspNetCore.Routing.Patterns;
-using Log = Grpc.AspNetCore.Server.Model.Internal.ServiceRouteBuilderHelper;
 using Grpc.AspNetCore.Server.Model.Internal;
 
 namespace Grpc.AspNetCore.Server.Internal;
@@ -116,7 +115,7 @@ internal class EndpointServiceBinder : ServiceBinderBase
 
         var httpMethod = method.Metadata.OfType<HttpMethodMetadata>().LastOrDefault();
 
-        Log.LogAddedServiceMethod(
+        ServiceRouteBuilderLog.LogAddedServiceMethod(
             _logger,
             method.Method.Name,
             method.Method.ServiceName,

@@ -47,7 +47,7 @@ internal class ServiceRouteBuilder
 
     internal List<IEndpointConventionBuilder> Build(IEndpointRouteBuilder endpointRouteBuilder, ServerServiceDefinition serverServiceDefinition)
     {
-        Helper.LogDiscoveringServiceMethods(_logger, typeof(ServerServiceDefinition));
+        ServiceRouteBuilderLog.DiscoveringServiceMethods(_logger, typeof(ServerServiceDefinition));
 
         var serviceBinder = new EndpointServiceBinder(_serverCallHandlerFactory, endpointRouteBuilder, _loggerFactory);
 
@@ -88,7 +88,7 @@ internal class ServiceRouteBuilder<[DynamicallyAccessedMembers(GrpcProtocolConst
 
     internal List<IEndpointConventionBuilder> Build(IEndpointRouteBuilder endpointRouteBuilder)
     {
-        Helper.LogDiscoveringServiceMethods(_logger, typeof(TService));
+        ServiceRouteBuilderLog.DiscoveringServiceMethods(_logger, typeof(TService));
 
         var serviceMethodProviderContext = new ServiceMethodProviderContext<TService>(_serverCallHandlerFactory);
         foreach (var serviceMethodProvider in _serviceMethodProviders)
@@ -119,7 +119,7 @@ internal class ServiceRouteBuilder<[DynamicallyAccessedMembers(GrpcProtocolConst
                 // Report the last HttpMethodMetadata added. It's the metadata used by routing.
                 var httpMethod = method.Metadata.OfType<HttpMethodMetadata>().LastOrDefault();
 
-                Helper.LogAddedServiceMethod(
+                ServiceRouteBuilderLog.LogAddedServiceMethod(
                     _logger,
                     method.Method.Name,
                     method.Method.ServiceName,
@@ -130,7 +130,7 @@ internal class ServiceRouteBuilder<[DynamicallyAccessedMembers(GrpcProtocolConst
         }
         else
         {
-            Helper.LogNoServiceMethodsDiscovered(_logger, typeof(TService));
+            ServiceRouteBuilderLog.NoServiceMethodsDiscovered(_logger, typeof(TService));
         }
 
         Helper.CreateUnimplementedEndpoints(
@@ -197,15 +197,12 @@ internal static class ServiceRouteBuilderHelper
 
         return endpointBuilder;
     }
+}
 
-    private static readonly Action<ILogger, string, string, MethodType, string, string, Exception?> _addedServiceMethod =
-        LoggerMessage.Define<string, string, MethodType, string, string>(LogLevel.Trace, new EventId(1, "AddedServiceMethod"), "Added gRPC method '{MethodName}' to service '{ServiceName}'. Method type: {MethodType}, HTTP method: {HttpMethod}, route pattern: '{RoutePattern}'.");
-
-    private static readonly Action<ILogger, Type, Exception?> _discoveringServiceMethods =
-        LoggerMessage.Define<Type>(LogLevel.Trace, new EventId(2, "DiscoveringServiceMethods"), "Discovering gRPC methods for {ServiceType}.");
-
-    private static readonly Action<ILogger, Type, Exception?> _noServiceMethodsDiscovered =
-        LoggerMessage.Define<Type>(LogLevel.Debug, new EventId(3, "NoServiceMethodsDiscovered"), "No gRPC methods discovered for {ServiceType}.");
+internal static partial class ServiceRouteBuilderLog
+{
+    [LoggerMessage(Level = LogLevel.Trace, EventId = 1, EventName = "AddedServiceMethod", Message = "Added gRPC method '{MethodName}' to service '{ServiceName}'. Method type: {MethodType}, HTTP method: {HttpMethod}, route pattern: '{RoutePattern}'.")]
+    private static partial void AddedServiceMethod(ILogger logger, string methodName, string serviceName, MethodType methodType, string HttpMethod, string routePattern);
 
     public static void LogAddedServiceMethod(ILogger logger, string methodName, string serviceName, MethodType methodType, IReadOnlyList<string> httpMethods, string routePattern)
     {
@@ -214,17 +211,13 @@ internal static class ServiceRouteBuilderHelper
             // There should be one HTTP method here, but concat in case someone has overriden metadata.
             var allHttpMethods = string.Join(',', httpMethods);
 
-            _addedServiceMethod(logger, methodName, serviceName, methodType, allHttpMethods, routePattern, null);
+            AddedServiceMethod(logger, methodName, serviceName, methodType, allHttpMethods, routePattern);
         }
     }
 
-    public static void LogDiscoveringServiceMethods(ILogger logger, Type serviceType)
-    {
-        _discoveringServiceMethods(logger, serviceType, null);
-    }
+    [LoggerMessage(Level = LogLevel.Trace, EventId = 2, EventName = "DiscoveringServiceMethods", Message = "Discovering gRPC methods for {ServiceType}.")]
+    public static partial void DiscoveringServiceMethods(ILogger logger, Type serviceType);
 
-    public static void LogNoServiceMethodsDiscovered(ILogger logger, Type serviceType)
-    {
-        _noServiceMethodsDiscovered(logger, serviceType, null);
-    }
+    [LoggerMessage(Level = LogLevel.Debug, EventId = 3, EventName = "NoServiceMethodsDiscovered", Message = "No gRPC methods discovered for {ServiceType}.")]
+    public static partial void NoServiceMethodsDiscovered(ILogger logger, Type serviceType);
 }
