@@ -18,6 +18,7 @@
 
 using Grpc.Core;
 using Server;
+using Microsoft.AspNetCore.Builder;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddGrpc();
