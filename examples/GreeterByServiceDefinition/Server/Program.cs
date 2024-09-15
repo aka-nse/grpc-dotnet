@@ -16,12 +16,20 @@
 
 #endregion
 
+using Grpc.Core;
 using Server;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddGrpc();
 
 var app = builder.Build();
-app.MapGrpcService(serviceProvider => Greet.Greeter.BindService(new GreeterService(serviceProvider.GetRequiredService<ILoggerFactory>())));
+app.MapGrpcService(getGreeterService);
 
 app.Run();
+
+static ServerServiceDefinition getGreeterService(IServiceProvider serviceProvider)
+{
+    var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+    var service = new GreeterService(loggerFactory);
+    return Greet.Greeter.BindService(service);
+}
